@@ -39,7 +39,7 @@ float humidity;
 #define I2C_MASTER_FREQ_HZ  100000
 #define I2C_MASTER_SCL_IO   40  /*!< gpio number for I2C master clock  40 8*/
 #define I2C_MASTER_SDA_IO   41  /*!< gpio number for I2C master data    41 18*/
-#define SERVER_URL "http://192.168.1.114:19093/update_sensors" // GET IP from sysenv
+//#define SERVER_URL "http://192.168.1.114:19093/update_sensors" // GET IP from sysenv
 
 const char *str_hw_type(int id)
 {
@@ -115,14 +115,34 @@ void aht20_init(void)
     ESP_LOGI(TAG, "%-20s: %2.2f degC", "temperature is", temperature);
 }
 
+char* extract_ip_address(const char* url) {
+    const char* ip_start = strstr(url, "//");
+    if (ip_start == NULL) {
+        return NULL; // Invalid URL format
+    }
+    ip_start += 2; // Move pointer past "//"
+    const char* ip_end = strchr(ip_start, ':');
+    if (ip_end == NULL) {
+        return NULL; // Invalid URL format
+    }
+
+    size_t ip_length = ip_end - ip_start;
+    char* ip_address = (char*)malloc(ip_length + 1); // +1 for null terminator
+    if (ip_address == NULL) {
+        return NULL; // Memory allocation failed
+    }
+    strncpy(ip_address, ip_start, ip_length);
+    ip_address[ip_length] = '\0'; // Null-terminate the string
+    return ip_address;
+}
+
 void send_sensor_data_task(void *pvParameters) {
+    char* ip_address = extract_ip_address(was_url);
     while (true) {
         aht20_read_temperature_humidity(aht20, &temperature_raw, &temperature, &humidity_raw, &humidity);
-        ESP_LOGI(TAG, "%-20s: %2.2f %%", "humidity is", humidity);
-        ESP_LOGI(TAG, "%-20s: %2.2f degC", "temperature is", temperature);
         char server_url[100];
-        snprintf(server_url, sizeof(server_url), "http://192.168.1.114:19093/update_sensors?temperature=%.2f&humidity=%.2f", temperature, humidity);
-        ESP_LOGI(TAG, "Query parameters: %s", server_url);
+        snprintf(server_url, sizeof(server_url), "http://%s:19093/update_sensors?temperature=%.2f&humidity=%.2f", ip_address, temperature, humidity);
+        ESP_LOGI(TAG, "Sensor task: %s", server_url);
         esp_http_client_config_t config = {
             .url = server_url,
         };

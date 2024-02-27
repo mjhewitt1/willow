@@ -2,6 +2,8 @@
 #include "i2c_bus.h"
 #include "aht20.h"
 
+extern char was_url[2048];
+
 enum willow_hw_t {
     WILLOW_HW_UNSUPPORTED = 0,
     WILLOW_HW_ESP32_S3_BOX,
