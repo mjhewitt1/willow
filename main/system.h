@@ -1,5 +1,6 @@
 #include "esp_peripherals.h"
 #include "i2c_bus.h"
+#include "aht20.h"
 
 enum willow_hw_t {
     WILLOW_HW_UNSUPPORTED = 0,
@@ -20,9 +21,11 @@ extern enum willow_hw_t hw_type;
 extern enum willow_state state;
 extern esp_periph_set_handle_t hdl_pset;
 extern i2c_bus_handle_t hdl_i2c_bus;
+extern aht20_dev_handle_t aht20;
 
 extern volatile bool restarting;
 
 const char *str_hw_type(int id);
 void init_system(void);
+void init_sensor_task(void);
 void restart_delayed(void);
