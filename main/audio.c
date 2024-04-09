@@ -59,7 +59,7 @@
 #define DEFAULT_WAKE_WORD           "hiesp"
 #define DEFAULT_WIS_TTS_URL         "https://infer.tovera.io/api/tts"
 #define DEFAULT_WIS_URL             "https://infer.tovera.io/api/willow"
-#define SAVE_FILENAME               "near"
+#define SAVE_FILENAME               "far"
 
 #define HTTP_STREAM_TIMEOUT_MS              2 * 1000
 #define HTTP_STREAM_TIMEOUT_MS_POST_REQUEST 10 * 1000

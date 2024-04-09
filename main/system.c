@@ -163,8 +163,8 @@ void init_system(void)
 {
     set_hw_type();
     init_i2c();
-    init_i2c_aht();
-    aht20_init();
+    //init_i2c_aht();
+    //aht20_init();
     ESP_ERROR_CHECK(init_ev_loop());
 }
 
