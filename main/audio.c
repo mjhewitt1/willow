@@ -59,6 +59,7 @@
 #define DEFAULT_WAKE_WORD           "hiesp"
 #define DEFAULT_WIS_TTS_URL         "https://infer.tovera.io/api/tts"
 #define DEFAULT_WIS_URL             "https://infer.tovera.io/api/willow"
+#define SAVE_FILENAME               "near"
 
 #define HTTP_STREAM_TIMEOUT_MS              2 * 1000
 #define HTTP_STREAM_TIMEOUT_MS_POST_REQUEST 10 * 1000
@@ -325,45 +326,6 @@ static esp_err_t cb_ar_event(audio_rec_evt_t *are, void *data)
 #endif
 
     switch (are->type) {
-        case AUDIO_REC_VAD_END:
-            ESP_LOGI(TAG, "AUDIO_REC_VAD_END");
-            if (esp_timer_is_active(hdl_sess_timer)) {
-                esp_timer_stop(hdl_sess_timer);
-            }
-            break;
-        case AUDIO_REC_VAD_START:
-            ESP_LOGI(TAG, "AUDIO_REC_VAD_START");
-            if (recording) {
-                break;
-            } else {
-                recording = true;
-            }
-
-            speech_rec_mode = config_get_char("speech_rec_mode", DEFAULT_SPEECH_REC_MODE);
-            if (strcmp(speech_rec_mode, "Multinet") == 0) {
-                msg = MSG_START_LOCAL;
-            } else if (strcmp(speech_rec_mode, "WIS") == 0) {
-                msg = MSG_START;
-            } else {
-                free(speech_rec_mode);
-                return ESP_ERR_INVALID_ARG;
-            }
-            free(speech_rec_mode);
-            xQueueSend(q_rec, &msg, 0);
-            break;
-        case AUDIO_REC_COMMAND_DECT:
-            // Multinet timeout
-            ESP_LOGI(TAG, "AUDIO_REC_COMMAND_DECT");
-            war.fn_err("unrecognized command");
-            if (lvgl_port_lock(lvgl_lock_timeout)) {
-                lv_obj_clear_flag(lbl_ln4, LV_OBJ_FLAG_HIDDEN);
-                lv_obj_set_style_text_align(lbl_ln4, LV_TEXT_ALIGN_LEFT, 0);
-                lv_label_set_text(lbl_ln4, "#ff0000 Unrecognized Command");
-                lvgl_port_unlock();
-            }
-
-            reset_timer(hdl_display_timer, config_get_int("display_timeout", DEFAULT_DISPLAY_TIMEOUT), false);
-            break;
         case AUDIO_REC_WAKEUP_END:
             ESP_LOGI(TAG, "AUDIO_REC_WAKEUP_END");
             msg = MSG_STOP;
@@ -374,7 +336,11 @@ static esp_err_t cb_ar_event(audio_rec_evt_t *are, void *data)
             ESP_LOGI(TAG, "AUDIO_REC_WAKEUP_START");
             if (recording) {
                 break;
+            } else {
+              recording = true;
             }
+            msg = MSG_START;
+            xQueueSend(q_rec, &msg, 0);
             if (!config_get_bool("multiwake", false)) {
                 if (config_get_bool("wake_confirmation", DEFAULT_WAKE_CONFIRMATION)) {
                     play_audio_ok(NULL);
@@ -385,12 +351,12 @@ static esp_err_t cb_ar_event(audio_rec_evt_t *are, void *data)
             recorder_sr_wakeup_result_t *wake_data = are->event_data;
             ESP_LOGI(TAG, "wake volume: %f", wake_data->data_volume);
             send_wake_start(wake_data->data_volume);
-            reset_timer(hdl_display_timer, config_get_int("display_timeout", DEFAULT_DISPLAY_TIMEOUT), true);
+            //reset_timer(hdl_display_timer, config_get_int("display_timeout", DEFAULT_DISPLAY_TIMEOUT), true);
 
             speech_rec_mode = config_get_char("speech_rec_mode", DEFAULT_SPEECH_REC_MODE);
 
             if (strcmp(speech_rec_mode, "WIS") == 0) {
-                reset_timer(hdl_sess_timer, config_get_int("stream_timeout", DEFAULT_STREAM_TIMEOUT), false);
+                //reset_timer(hdl_sess_timer, config_get_int("stream_timeout", DEFAULT_STREAM_TIMEOUT), false);
             }
             if (lvgl_port_lock(lvgl_lock_timeout)) {
                 lv_obj_add_flag(lbl_ln1, LV_OBJ_FLAG_HIDDEN);
@@ -403,7 +369,7 @@ static esp_err_t cb_ar_event(audio_rec_evt_t *are, void *data)
                 if (strcmp(speech_rec_mode, "Multinet") == 0) {
                     lv_label_set_text_static(lbl_ln3, "Say local command...");
                 } else if (strcmp(speech_rec_mode, "WIS") == 0) {
-                    lv_label_set_text_static(lbl_ln3, "Say command...");
+                    lv_label_set_text_static(lbl_ln3, "Recording...");
                 } else {
                     return ESP_ERR_INVALID_ARG;
                 }
@@ -416,45 +382,7 @@ static esp_err_t cb_ar_event(audio_rec_evt_t *are, void *data)
             break;
         default:
             speech_rec_mode = config_get_char("speech_rec_mode", DEFAULT_SPEECH_REC_MODE);
-            if (strcmp(speech_rec_mode, "Multinet") == 0) {
-#if defined(WILLOW_SUPPORT_MULTINET)
-                // Catch all for local commands
-                command_id = are->type;
-                bool was_mode = config_get_bool("was_mode", DEFAULT_WAS_MODE);
-                char *command_endpoint = config_get_char("command_endpoint", DEFAULT_COMMAND_ENDPOINT);
-                char *json;
-                json = calloc(sizeof(char), 29 + strlen(lookup_cmd_multinet(command_id)));
-                snprintf(json, 29 + strlen(lookup_cmd_multinet(command_id)), "{\"text\":\"%s\",\"language\":\"en\"}",
-                         lookup_cmd_multinet(command_id));
-                if (was_mode) {
-                    was_send_endpoint(json, false);
-                } else if (strcmp(command_endpoint, "Home Assistant") == 0) {
-                    hass_send(json);
-                } else if (strcmp(command_endpoint, "openHAB") == 0) {
-                    openhab_send(lookup_cmd_multinet(command_id));
-                } else if (strcmp(command_endpoint, "REST") == 0) {
-                    rest_send(json);
-                }
-                free(command_endpoint);
-                free(json);
-
-                ESP_LOGI(TAG, "Got local command ID: '%d'", command_id);
-                if (lvgl_port_lock(lvgl_lock_timeout)) {
-                    lv_obj_clear_flag(lbl_ln1, LV_OBJ_FLAG_HIDDEN);
-                    lv_obj_clear_flag(lbl_ln2, LV_OBJ_FLAG_HIDDEN);
-                    lv_obj_add_flag(lbl_ln3, LV_OBJ_FLAG_HIDDEN);
-
-                    lv_label_set_text_static(lbl_ln1, "I heard command:");
-                    lv_label_set_text(lbl_ln2, lookup_cmd_multinet(command_id));
-                    lvgl_port_unlock();
-                }
-                reset_timer(hdl_display_timer, config_get_int("display_timeout", DEFAULT_DISPLAY_TIMEOUT), false);
-#else
-                ESP_LOGE(TAG, "multinet not supported but enabled in config");
-#endif
-            } else {
-                ESP_LOGI(TAG, "cb_ar_event: unhandled event: '%d'", are->type);
-            }
+            ESP_LOGI(TAG, "cb_ar_event: unhandled event: '%d'", are->type);
             free(speech_rec_mode);
             break;
     }
@@ -504,6 +432,7 @@ static esp_err_t hdl_ev_hs_to_api(http_stream_event_msg_t *msg)
             } else if (strcmp(audio_codec, "PCM") == 0) {
                 esp_http_client_set_header(http, "x-audio-codec", "pcm");
             }
+            esp_http_client_set_header(http, "x-filename", SAVE_FILENAME);
             free(audio_codec);
             total_write = 0;
             return ESP_OK;
@@ -897,7 +826,7 @@ static void at_read(void *data)
                     recording = false;
                     stream_to_api = false;
                     if (lvgl_port_lock(lvgl_lock_timeout)) {
-                        lv_label_set_text_static(lbl_ln3, multiwake_won ? "Thinking..." : "WOW Active - Exiting");
+                        lv_label_set_text_static(lbl_ln3, multiwake_won ? "IDLE" : "WOW Active - Exiting");
                         lv_obj_add_flag(btn_cancel, LV_OBJ_FLAG_HIDDEN);
                         lvgl_port_unlock();
                     }
@@ -970,9 +899,7 @@ esp_err_t init_audio(void)
 
     init_audio_response();
     init_session_timer();
-    if (strcmp(speech_rec_mode, "WIS") == 0) {
-        init_ap_to_api();
-    }
+    init_ap_to_api();
     free(speech_rec_mode);
     ESP_RETURN_ON_ERROR(start_rec(), TAG, "start_rec failed");
     es7210_adc_set_gain(config_get_int("mic_gain", DEFAULT_MIC_GAIN));
@@ -985,7 +912,7 @@ esp_err_t init_audio(void)
     char wake_help[STR_WAKE_LEN] = "";
     if (strcmp(wake_word, "hiesp") == 0) {
 #if defined(CONFIG_SR_WN_WN9_HIESP) || defined(CONFIG_SR_WN_WN9_HIESP_MULTI)
-        strncpy(wake_help, "Say 'Hi ESP' to start!", STR_WAKE_LEN);
+        strncpy(wake_help, "IDLE - waiting to start.", STR_WAKE_LEN);
 #endif
     } else if (strcmp(wake_word, "alexa") == 0) {
 #if defined(CONFIG_SR_WN_WN9_ALEXA) || defined(CONFIG_SR_WN_WN9_ALEXA_MULTI)

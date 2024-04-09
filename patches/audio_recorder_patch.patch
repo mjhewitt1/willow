@@ -1,0 +1,117 @@
+diff --git a/components/audio_recorder/audio_recorder.c b/components/audio_recorder/audio_recorder.c
+--- deps/esp-adf/components/audio_recorder/audio_recorder.c
++++ deps/esp-adf/components/audio_recorder/audio_recorder.c
+@@ -264,88 +264,14 @@
+                 if (recorder->sr_handle) {
+                     recorder->sr_iface->base.get_state(recorder->sr_handle, &sr_st);
+                 }
+-
+-                if (sr_st.wwe_enable) {
+-                    recorder->state = RECORDER_ST_WAKEUP;
+-                    audio_recorder_wakeup_timer_start(recorder, recorder->state);
+-                    audio_recorder_update_state_2_user(recorder, AUDIO_REC_WAKEUP_START, &recorder->wakeup_result, sizeof(recorder_sr_wakeup_result_t));
+-                } else {
+-                    recorder->state = RECORDER_ST_SPEECHING;
+-                    audio_recorder_update_state_2_user(recorder, AUDIO_REC_WAKEUP_START, &recorder->wakeup_result, sizeof(recorder_sr_wakeup_result_t));
+-                    audio_recorder_update_state_2_user(recorder, AUDIO_REC_VAD_START, NULL, 0);
+-                    audio_recorder_encoder_enable(recorder, true);
+-                }
+-            }
+-            break;
+-        }
+-        case RECORDER_ST_WAKEUP: {
+-            if (event == RECORDER_EVENT_SPEECH_DECT) {
+-                if (recorder->vad_check) {
+-                    recorder->state = RECORDER_ST_WAIT_FOR_SPEECH;
+-                    audio_recorder_vad_timer_start(recorder, recorder->state);
+-                } else {
+-                    recorder->state = RECORDER_ST_SPEECHING;
+-                    audio_recorder_update_state_2_user(recorder, AUDIO_REC_VAD_START, NULL, 0);
+-                    audio_recorder_encoder_enable(recorder, true);
+-                }
+-            } else if (event == RECORDER_EVENT_WAKEUP_TIMER_EXPIRED) {
+-                recorder->state = RECORDER_ST_IDLE;
+-                esp_timer_stop(recorder->vad_timer);
+-                audio_recorder_update_state_2_user(recorder, AUDIO_REC_WAKEUP_END, NULL, 0);
+-            }
+-            break;
+-        }
+-        case RECORDER_ST_WAIT_FOR_SPEECH: {
+-            if (event == RECORDER_EVENT_NOISE_DECT) {
+-                recorder->state = RECORDER_ST_WAKEUP;
+-            } else if (event == RECORDER_EVENT_VAD_TIMER_EXPIRED) {
+                 recorder->state = RECORDER_ST_SPEECHING;
+-                esp_timer_stop(recorder->wakeup_timer);
+-                audio_recorder_update_state_2_user(recorder, AUDIO_REC_VAD_START, NULL, 0);
++                audio_recorder_update_state_2_user(recorder, AUDIO_REC_WAKEUP_START, &recorder->wakeup_result, sizeof(recorder_sr_wakeup_result_t));
+                 audio_recorder_encoder_enable(recorder, true);
+-            } else if (event == RECORDER_EVENT_WAKEUP_TIMER_EXPIRED) {
+-                recorder->state = RECORDER_ST_IDLE;
+-                esp_timer_stop(recorder->vad_timer);
+-                audio_recorder_update_state_2_user(recorder, AUDIO_REC_WAKEUP_END, NULL, 0);
+             }
+             break;
+         }
+         case RECORDER_ST_SPEECHING: {
+-            if (event == RECORDER_EVENT_NOISE_DECT) {
+-                if (recorder->vad_check) {
+-                    recorder->state = RECORDER_ST_WAIT_FOR_SILENCE;
+-                    audio_recorder_vad_timer_start(recorder, recorder->state);
+-                } else {
+-                    recorder->state = RECORDER_ST_WAIT_FOR_SLEEP;
+-                    audio_recorder_wakeup_timer_start(recorder, recorder->state);
+-                    audio_recorder_update_state_2_user(recorder, AUDIO_REC_VAD_END, NULL, 0);
+-                    audio_recorder_encoder_enable(recorder, false);
+-                }
+-            }
+-            break;
+-        }
+-        case RECORDER_ST_WAIT_FOR_SILENCE: {
+-            if (event == RECORDER_EVENT_SPEECH_DECT) {
+-                recorder->state = RECORDER_ST_SPEECHING;
+-                esp_timer_stop(recorder->vad_timer);
+-            } else if (event == RECORDER_EVENT_VAD_TIMER_EXPIRED) {
+-                recorder->state = RECORDER_ST_WAIT_FOR_SLEEP;
+-                audio_recorder_wakeup_timer_start(recorder, recorder->state);
+-                audio_recorder_update_state_2_user(recorder, AUDIO_REC_VAD_END, NULL, 0);
+-                audio_recorder_encoder_enable(recorder, false);
+-            }
+-            break;
+-        }
+-        case RECORDER_ST_WAIT_FOR_SLEEP: {
+-            if (event == RECORDER_EVENT_SPEECH_DECT) {
+-                recorder->state = RECORDER_ST_WAIT_FOR_SPEECH;
+-                audio_recorder_vad_timer_start(recorder, recorder->state);
+-            } else if (event == RECORDER_EVENT_WAKEUP_TIMER_EXPIRED) {
+-                recorder->state = RECORDER_ST_IDLE;
+-                esp_timer_stop(recorder->vad_timer);
+-                audio_recorder_update_state_2_user(recorder, AUDIO_REC_WAKEUP_END, NULL, 0);
+-            }
+-            break;
++            //recorder->state = RECORDER_ST_WAIT_FOR_SLEEP;
+         }
+         default:
+             break;
+@@ -387,12 +313,10 @@
+             }
+             case RECORDER_CMD_TRIGGER_STOP: {
+                 ESP_LOGI(TAG, "RECORDER_CMD_TRIGGER_STOP [state %d]", recorder->state);
+-                if ((recorder->state >= RECORDER_ST_SPEECHING) && (recorder->state <= RECORDER_ST_WAIT_FOR_SILENCE)) {
+-                    audio_recorder_update_state_2_user(recorder, AUDIO_REC_VAD_END, NULL, 0);
+-                    audio_recorder_encoder_enable(recorder, false);
+-                }
+-                if (recorder->state != RECORDER_ST_IDLE) {
++                if (recorder->state >= RECORDER_ST_SPEECHING) {
+                     audio_recorder_update_state_2_user(recorder, AUDIO_REC_WAKEUP_END, NULL, 0);
++                    audio_recorder_encoder_enable(recorder, false);
++                    audio_recorder_update_state(recorder, RECORDER_ST_IDLE);
+                 }
+                 audio_recorder_reset(recorder);
+                 if (recorder->sr_handle && recorder->sr_iface) {
+@@ -696,4 +620,4 @@
+     audio_recorder_t *recorder = (audio_recorder_t *)handle;
+ 
+     return recorder->state >= RECORDER_ST_WAKEUP ? true : false;
+-}
+\ No newline at end of file
++}

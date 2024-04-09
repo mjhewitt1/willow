@@ -163,8 +163,8 @@ err_nvs:
     init_input_key_service();
     init_audio();
     init_lvgl_touch();
-    init_display_timer();
-    init_sensor_task();
+    //init_display_timer();
+    //init_sensor_task();
 
 #ifndef CONFIG_WILLOW_ETHERNET
     get_mac_address(); // should be on wifi by now; print the MAC
@@ -179,8 +179,8 @@ err_nvs:
     // we can also still crash in the while loop below - this should be improved
     ESP_ERROR_CHECK_WITHOUT_ABORT(esp_ota_mark_app_valid_cancel_rollback());
 
-    ESP_ERROR_CHECK_WITHOUT_ABORT(
-        reset_timer(hdl_display_timer, config_get_int("display_timeout", DEFAULT_DISPLAY_TIMEOUT), false));
+    //ESP_ERROR_CHECK_WITHOUT_ABORT(
+        //reset_timer(hdl_display_timer, config_get_int("display_timeout", DEFAULT_DISPLAY_TIMEOUT), false));
 
 #ifdef CONFIG_WILLOW_DEBUG_RUNTIME_STATS
     xTaskCreate(&task_debug_runtime_stats, "dbg_runtime_stats", 4 * 1024, NULL, 0, NULL);
