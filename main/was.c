@@ -95,6 +95,20 @@ static void IRAM_ATTR cb_ws_event(const void *arg_evh, const esp_event_base_t *b
                     goto cleanup;
                 }
 
+                cJSON *json_record = cJSON_GetObjectItemCaseSensitive(cjson, "record-audio");
+                if (cJSON_IsObject(json_record)) {
+                    ESP_LOGI(TAG, "record-audio");
+                    audio_recorder_trigger_start(hdl_ar);
+                    goto cleanup;
+                }
+
+                cJSON *json_stop_record = cJSON_GetObjectItemCaseSensitive(cjson, "stop-record-audio");
+                if (cJSON_IsObject(json_stop_record)) {
+                    ESP_LOGI(TAG, "stop-record-audio");
+                    audio_recorder_trigger_stop(hdl_ar);
+                    goto cleanup;
+                }
+
                 cJSON *json_result = cJSON_GetObjectItemCaseSensitive(cjson, "result");
                 if (cJSON_IsObject(json_result)) {
                     cJSON *ok = cJSON_GetObjectItemCaseSensitive(json_result, "ok");
